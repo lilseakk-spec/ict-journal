@@ -1,0 +1,17 @@
+{
+  "name": "ICT Trade Journal — Smart Money",
+  "short_name": "ICT Journal",
+  "description": "ICT / Smart Money trade günlüğü — işlem analizi, risk yönetimi ve performans takibi.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07080e",
+  "theme_color": "#07080e",
+  "lang": "tr",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

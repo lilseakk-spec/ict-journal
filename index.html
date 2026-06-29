@@ -6,7 +6,9 @@
   <title>ICT Trade Journal — Smart Money</title>
   <meta name="description" content="ICT / Smart Money trade günlüğü — işlem analizi, risk yönetimi ve performans takibi." />
   <meta name="theme-color" content="#07080e" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0b14'/%3E%3Cpath d='M16 6l8 5-8 5-8-5z' fill='%23d6b35d'/%3E%3Cpath d='M8 16l8 5 8-5M8 21l8 5 8-5' stroke='%23d6b35d' stroke-width='1.6' fill='none'/%3E%3C/svg%3E" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
@@ -693,5 +695,13 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+  // Register service worker — only over http(s), so file:// stays unaffected.
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () =>
+      navigator.serviceWorker.register('sw.js').catch(() => {})
+    );
+  }
+</script>
 </body>
 </html>
