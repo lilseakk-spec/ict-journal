@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupForm();
   setupScreenshot();
   setupCalNav();
+  setupKeyboard();
   setupSymbolAC('symbol-autocomplete', 'f-symbol-input', 'symbol-dropdown', 'f-symbol');
   setupSymbolAC('calc-symbol-ac', 'calc-symbol-input', 'calc-symbol-dropdown', 'calc-symbol');
 
@@ -132,28 +133,68 @@ document.addEventListener('DOMContentLoaded', () => {
 // ===== NAVIGATION =====
 function setupNav() {
   document.querySelectorAll('.nav-item').forEach(btn =>
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('page-' + btn.dataset.page).classList.add('active');
-      const page = btn.dataset.page;
-      if (page === 'dashboard') renderDashboard();
-      if (page === 'trades')    renderTradeLog();
-      if (page === 'analytics') renderAnalytics();
-      if (page === 'journal')   renderJournal();
-      if (page === 'calendar')  renderCalendar();
-      if (page === 'risk')      renderRiskPage();
-      if (page === 'mistakes')  renderMistakePage();
-    })
+    btn.addEventListener('click', () => goToPage(btn.dataset.page))
   );
 }
 
 function goToPage(name) {
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.nav-item[data-page="${name}"]`).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${name}"]`)?.classList.add('active');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
+  document.querySelector('.main').scrollTop = 0;
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'trades')    renderTradeLog();
+  if (name === 'analytics') renderAnalytics();
+  if (name === 'journal')   renderJournal();
+  if (name === 'calendar')  renderCalendar();
+  if (name === 'risk')      renderRiskPage();
+  if (name === 'mistakes')  renderMistakePage();
+}
+
+function setupKeyboard() {
+  const pages = ['dashboard','trades','add','risk','mistakes','analytics','journal','calendar'];
+  document.addEventListener('keydown', e => {
+    // Ignore while typing or with modifier keys
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (['input','textarea','select'].includes(tag) || e.target.isContentEditable) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    // Esc closes any open modal
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
+      return;
+    }
+    // 1-8 → pages
+    if (e.key >= '1' && e.key <= '8') { goToPage(pages[+e.key - 1]); return; }
+    // n → new trade
+    if (e.key === 'n' || e.key === 'N') { goToPage('add'); return; }
+    // / → focus trade search
+    if (e.key === '/') {
+      goToPage('trades');
+      setTimeout(() => document.getElementById('trade-search')?.focus(), 50);
+      e.preventDefault(); return;
+    }
+    // ? → shortcuts help
+    if (e.key === '?') { toggleShortcutHelp(); return; }
+  });
+}
+
+function toggleShortcutHelp() {
+  let el = document.getElementById('shortcut-help');
+  if (el) { el.remove(); return; }
+  el = document.createElement('div');
+  el.id = 'shortcut-help';
+  el.className = 'shortcut-help';
+  el.innerHTML = `
+    <div class="sh-title">Klavye Kısayolları</div>
+    <div class="sh-row"><kbd>1</kbd>–<kbd>8</kbd><span>Sayfalar arası geçiş</span></div>
+    <div class="sh-row"><kbd>N</kbd><span>Yeni trade ekle</span></div>
+    <div class="sh-row"><kbd>/</kbd><span>Trade ara</span></div>
+    <div class="sh-row"><kbd>Esc</kbd><span>Pencereyi kapat</span></div>
+    <div class="sh-row"><kbd>?</kbd><span>Bu menüyü aç / kapat</span></div>`;
+  el.onclick = () => el.remove();
+  document.body.appendChild(el);
 }
 
 function refreshAll() {
@@ -489,24 +530,7 @@ function renderDashboard() {
   let peak=0, eq=0, maxDD=0;
   sorted.forEach(t => { eq+=t.pnl||0; if(eq>peak)peak=eq; maxDD=Math.max(maxDD,peak-eq); });
 
-  const wkStart  = dayjs().startOf('isoWeek');
-  const wkTrades = trades.filter(t => dayjs(t.date).isAfter(wkStart));
-  const wkCount  = wkTrades.length;
-  const wkPNL    = wkTrades.reduce((s,t)=>s+(t.pnl||0),0);
-  const wkWins   = wkTrades.filter(t=>t.result==='win').length;
-  const wkWR     = wkCount ? ((wkWins/wkCount)*100).toFixed(0) : 0;
-  const wkRR     = wkCount ? (wkTrades.reduce((s,t)=>s+(t.rr||0),0)/wkCount).toFixed(2) : '—';
-  const wkTP     = wkTrades.filter(t=>t.weeklyTP).length;
-
-  const pnlCls   = wkPNL >= 0 ? 'up' : 'down';
-  const wkEl     = document.getElementById('wk-pnl');
-  wkEl.textContent = fmtPNL(wkPNL);
-  wkEl.className = `week-cell-val ${pnlCls}`;
-  document.getElementById('wk-count').textContent = wkCount || '—';
-  document.getElementById('wk-dates').textContent = `${wkStart.format('DD MMM')} – ${dayjs().format('DD MMM')}`;
-  document.getElementById('wk-wr').textContent    = wkCount ? `%${wkWR} win rate` : '— win rate';
-  document.getElementById('wk-rr').textContent    = wkRR;
-  document.getElementById('wk-tp').textContent    = wkTP ? `${wkTP} haftalık TP` : '—';
+  const wkCount = renderWeekHub();
 
   document.getElementById('stat-total').textContent    = total;
   document.getElementById('stat-total-sub').textContent= `Bu hafta: ${wkCount}`;
@@ -527,6 +551,72 @@ function renderDashboard() {
   renderEntryModelChartDash();
   renderMistakeChartDash();
   renderRecentTrades();
+}
+
+// Realized R-multiple for a trade. Uses risk amount from balance,
+// falls back to planned RR / -1 when balance is unknown.
+function tradeR(t) {
+  const bal = riskSettings.balance || 0;
+  const riskAmt = bal && t.riskPct ? bal * t.riskPct / 100 : 0;
+  if (riskAmt > 0) return (t.pnl || 0) / riskAmt;
+  if (t.result === 'win')  return t.rr || 1;
+  if (t.result === 'loss') return -1;
+  return 0;
+}
+
+function renderWeekHub() {
+  const wkStart  = dayjs().startOf('isoWeek');
+  const wkEnd    = dayjs().endOf('isoWeek');
+  const wkTrades = trades.filter(t => dayjs(t.date).isAfter(wkStart) && dayjs(t.date).isBefore(wkEnd));
+  const wkCount  = wkTrades.length;
+  const wkPNL    = wkTrades.reduce((s,t)=>s+(t.pnl||0),0);
+  const wkWins   = wkTrades.filter(t=>t.result==='win').length;
+  const wkWR     = wkCount ? Math.round(wkWins/wkCount*100) : 0;
+  const wkR      = wkTrades.reduce((s,t)=>s+tradeR(t),0);
+  const wkTP     = wkTrades.filter(t=>t.weeklyTP).length;
+  const daysLeft = Math.max(0, wkEnd.diff(dayjs(), 'day'));
+
+  const goal = riskSettings.weeklyGoal || 0;
+
+  document.getElementById('wh-range').textContent =
+    `${wkStart.format('DD MMM')} – ${wkEnd.format('DD MMM')}`;
+
+  const curEl = document.getElementById('wh-current');
+  curEl.textContent = fmtPNL(wkPNL);
+
+  const fill   = document.getElementById('wh-bar-fill');
+  const pctEl  = document.getElementById('wh-pct');
+  const tgtEl  = document.getElementById('wh-target');
+  const goalWrap = document.querySelector('.wh-goal-val');
+
+  if (goal > 0) {
+    tgtEl.textContent = fmtPNL(goal);
+    const pct = Math.max(0, Math.min(100, (wkPNL / goal) * 100));
+    fill.style.width = (wkPNL < 0 ? Math.min(100, Math.abs(wkPNL/goal)*100) : pct) + '%';
+    fill.classList.toggle('reached', wkPNL >= goal);
+    fill.classList.toggle('negative', wkPNL < 0);
+    goalWrap.classList.toggle('reached', wkPNL >= goal);
+    pctEl.textContent = wkPNL < 0 ? '' : Math.round(pct) + '%';
+  } else {
+    tgtEl.innerHTML = `<button class="wh-set-goal" onclick="goToPage('risk')">hedef belirle →</button>`;
+    fill.style.width = '0%';
+    fill.classList.remove('reached','negative');
+    goalWrap.classList.remove('reached');
+    pctEl.textContent = '';
+  }
+
+  const setVal = (id, val, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    el.className = 'wh-stat-val' + (cls ? ' ' + cls : '');
+  };
+  setVal('wh-count', wkCount || '0');
+  setVal('wh-wr', wkCount ? '%'+wkWR : '—', wkCount ? (wkWR>=50?'up':'down') : '');
+  setVal('wh-r', wkCount ? (wkR>=0?'+':'')+wkR.toFixed(1)+'R' : '—', wkCount ? (wkR>=0?'up':'down') : '');
+  setVal('wh-tp', wkTP, wkTP>0?'gold':'');
+  setVal('wh-days', daysLeft+'g');
+
+  return wkCount;
 }
 
 function renderEquityChart() {
@@ -701,6 +791,7 @@ function saveRiskSettings() {
     riskPct:   parseFloat(document.getElementById('acct-risk-pct').value) || 1,
     dailyLimit:parseFloat(document.getElementById('acct-daily-limit').value) || 3,
     maxRisk:   parseFloat(document.getElementById('acct-risk-pct').value) || 2,
+    weeklyGoal:parseFloat(document.getElementById('acct-weekly-goal').value) || 0,
   };
   localStorage.setItem('ict_risk', JSON.stringify(riskSettings));
   document.getElementById('sb-username').textContent = riskSettings.name || 'Trader';
@@ -713,6 +804,7 @@ function loadRiskSettings() {
   document.getElementById('acct-balance').value     = riskSettings.balance || '';
   document.getElementById('acct-risk-pct').value    = riskSettings.riskPct || 1;
   document.getElementById('acct-daily-limit').value = riskSettings.dailyLimit || 3;
+  document.getElementById('acct-weekly-goal').value = riskSettings.weeklyGoal || '';
   document.getElementById('sb-username').textContent= riskSettings.name || 'Trader';
 }
 
@@ -1034,6 +1126,32 @@ function renderInsights() {
     const lwR = lowEmo.filter(t=>t.result==='win').length/lowEmo.length;
     if (Math.abs(hwR-lwR)>.1)
       insights.push({ icon:'🧠', text:`Psikoloji önemli! İyi hissettiğinizde WR %${(hwR*100).toFixed(0)}, kötü hissettiğinizde %${(lwR*100).toFixed(0)}. Duygusal kontrolünüz performansınızı doğrudan etkiliyor.` });
+  }
+
+  // Discipline score — trades with no mistakes
+  const clean = trades.filter(t => !(t.mistakes||[]).some(m => m && m!=='none')).length;
+  const discPct = Math.round(clean/total*100);
+  if (total >= 3) {
+    if (discPct >= 80)      insights.push({ icon:'🛡️', text:`Disiplin skorunuz <strong>%${discPct}</strong> — işlemlerinizin çoğu hatasız. Mükemmel öz kontrol, böyle devam.` });
+    else if (discPct >= 50) insights.push({ icon:'🛡️', text:`Disiplin skorunuz <strong>%${discPct}</strong>. İşlemlerin yarısında bir hata var — en sık tekrarlananı hedef alın.` });
+    else                    insights.push({ icon:'🚨', text:`Disiplin skorunuz <strong>%${discPct}</strong>. İşlemlerin çoğunda kural ihlali var. Plan & checklist olmadan işleme girmeyin.` });
+  }
+
+  // Expectancy in R
+  const expR = trades.reduce((s,t)=>s+tradeR(t),0)/total;
+  if (total >= 5) {
+    if (expR > 0) insights.push({ icon:'📈', text:`İşlem başına beklentiniz <strong>+${expR.toFixed(2)}R</strong>. Sisteminiz pozitif beklentiye sahip — uzun vadede kazandıran budur.` });
+    else          insights.push({ icon:'📉', text:`İşlem başına beklentiniz <strong>${expR.toFixed(2)}R</strong>. Negatif beklenti — RR'yi yükseltin veya win rate'i artıracak filtreler ekleyin.` });
+  }
+
+  // Best day of week
+  const dayPNL = {};
+  trades.forEach(t => { const d=dayjs(t.date).day(); dayPNL[d]=(dayPNL[d]||0)+(t.pnl||0); });
+  const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+  const bestDay = Object.entries(dayPNL).sort((a,b)=>b[1]-a[1])[0];
+  const worstDay = Object.entries(dayPNL).sort((a,b)=>a[1]-b[1])[0];
+  if (bestDay && worstDay && bestDay[0]!==worstDay[0] && total >= 5) {
+    insights.push({ icon:'📅', text:`En kârlı gününüz <strong>${dayNames[bestDay[0]]}</strong> (${fmtPNL(bestDay[1])}), en zayıfı <strong>${dayNames[worstDay[0]]}</strong> (${fmtPNL(worstDay[1])}). Güçlü günlerinize ağırlık verin.` });
   }
 
   el.innerHTML = insights.length

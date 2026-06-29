@@ -69,6 +69,7 @@
           <div class="user-name" id="sb-username">Trader</div>
           <div class="user-role">Smart Money</div>
         </div>
+        <button class="kbd-hint" onclick="toggleShortcutHelp()" title="Klavye kısayolları">⌨</button>
       </div>
     </div>
   </aside>
@@ -120,12 +121,23 @@
         </div>
       </div>
 
-      <!-- Bu hafta özeti -->
-      <div class="week-strip" id="week-strip">
-        <div class="week-cell"><div class="week-cell-label">Bu Hafta İşlem</div><div class="week-cell-val" id="wk-count">—</div><div class="week-cell-sub" id="wk-dates">—</div></div>
-        <div class="week-cell"><div class="week-cell-label">Haftalık P&L</div><div class="week-cell-val" id="wk-pnl">—</div><div class="week-cell-sub" id="wk-wr">— win rate</div></div>
-        <div class="week-cell"><div class="week-cell-label">Avg RR</div><div class="week-cell-val" id="wk-rr">—</div><div class="week-cell-sub">bu hafta ortalama</div></div>
-        <div class="week-cell"><div class="week-cell-label">Haftalık TP</div><div class="week-cell-val" id="wk-tp">—</div><div class="week-cell-sub">hedef işlem sayısı</div></div>
+      <!-- Haftalık hedef hub -->
+      <div class="week-hub" id="week-hub">
+        <div class="wh-top">
+          <div class="wh-title">Haftalık Hedef <span class="wh-range" id="wh-range">—</span></div>
+          <div class="wh-goal-val"><span id="wh-current">—</span><span class="wh-sep">/</span><span id="wh-target">hedef yok</span></div>
+        </div>
+        <div class="wh-bar">
+          <div class="wh-bar-fill" id="wh-bar-fill"></div>
+          <span class="wh-pct" id="wh-pct"></span>
+        </div>
+        <div class="wh-stats">
+          <div class="wh-stat"><span class="wh-stat-label">İşlem</span><span class="wh-stat-val" id="wh-count">—</span></div>
+          <div class="wh-stat"><span class="wh-stat-label">Win Rate</span><span class="wh-stat-val" id="wh-wr">—</span></div>
+          <div class="wh-stat"><span class="wh-stat-label">R Kazancı</span><span class="wh-stat-val" id="wh-r">—</span></div>
+          <div class="wh-stat"><span class="wh-stat-label">Haftalık TP</span><span class="wh-stat-val" id="wh-tp">—</span></div>
+          <div class="wh-stat"><span class="wh-stat-label">Kalan Gün</span><span class="wh-stat-val" id="wh-days">—</span></div>
+        </div>
       </div>
 
       <div class="content">
@@ -468,6 +480,10 @@
               <div class="form-group">
                 <label>Günlük Max Kayıp (%)</label>
                 <input type="number" id="acct-daily-limit" placeholder="3" step="0.5" />
+              </div>
+              <div class="form-group">
+                <label>Haftalık Hedef ($) <span class="hint-text">dashboard'da takip</span></label>
+                <input type="number" id="acct-weekly-goal" placeholder="500" step="50" />
               </div>
             </div>
             <button class="btn-primary" onclick="saveRiskSettings()">Kaydet</button>
