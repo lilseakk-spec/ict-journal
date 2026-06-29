@@ -1,0 +1,11 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Local tooling
+node_modules/
+.cache/
+
+# Local launcher (Windows-only, not needed online)
+Başlat.bat

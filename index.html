@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICT Trade Journal — Smart Money</title>
+  <meta name="description" content="ICT / Smart Money trade günlüğü — işlem analizi, risk yönetimi ve performans takibi." />
+  <meta name="theme-color" content="#07080e" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0b14'/%3E%3Cpath d='M16 6l8 5-8 5-8-5z' fill='%23d6b35d'/%3E%3Cpath d='M8 16l8 5 8-5M8 21l8 5 8-5' stroke='%23d6b35d' stroke-width='1.6' fill='none'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/isoWeek.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-icon">◈</span>
+      <div>
+        <div class="logo-title">ICT Journal</div>
+        <div class="logo-sub">Smart Money</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="trades">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 16 4-4 4 4 4-4"/></svg>
+        Trade Log
+      </button>
+      <button class="nav-item" data-page="add">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        Trade Ekle
+      </button>
+      <button class="nav-item" data-page="risk">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Kasa & Risk
+      </button>
+      <button class="nav-item" data-page="mistakes">
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Hata Analizi
+      </button>
+      <button class="nav-item" data-page="analytics">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="10" width="2" height="8"/><rect x="12" y="6" width="2" height="12"/><rect x="17" y="3" width="2" height="15"/></svg>
+        Analitik
+      </button>
+      <button class="nav-item" data-page="journal">
+        <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 10h8M8 14h5"/></svg>
+        Günlük
+      </button>
+      <button class="nav-item" data-page="calendar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Takvim
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">ICT</div>
+        <div>
+          <div class="user-name" id="sb-username">Trader</div>
+          <div class="user-role">Smart Money</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main">
+
+    <!-- ─── DASHBOARD ─── -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="page-sub">Genel performans özeti</p>
+        </div>
+        <div class="header-date" id="header-date"></div>
+      </div>
+
+      <!-- Stats strip — pure typography, no cards -->
+      <div class="stats-strip">
+        <div class="stat-item">
+          <div class="stat-label">Toplam İşlem</div>
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-sub" id="stat-total-sub">bu hafta —</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Win Rate</div>
+          <div class="stat-value" id="stat-winrate">—</div>
+          <div class="stat-sub" id="stat-wr-sub">W — / L —</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Toplam P&L</div>
+          <div class="stat-value" id="stat-pnl">—</div>
+          <div class="stat-sub" id="stat-pnl-sub">ort. —</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Profit Factor</div>
+          <div class="stat-value" id="stat-pf">—</div>
+          <div class="stat-sub" id="stat-pf-sub">avg rr —</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">En İyi Seri</div>
+          <div class="stat-value gold" id="stat-streak">—</div>
+          <div class="stat-sub">kazanma serisi</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Max Drawdown</div>
+          <div class="stat-value down" id="stat-dd">—</div>
+          <div class="stat-sub">en kötü düşüş</div>
+        </div>
+      </div>
+
+      <!-- Bu hafta özeti -->
+      <div class="week-strip" id="week-strip">
+        <div class="week-cell"><div class="week-cell-label">Bu Hafta İşlem</div><div class="week-cell-val" id="wk-count">—</div><div class="week-cell-sub" id="wk-dates">—</div></div>
+        <div class="week-cell"><div class="week-cell-label">Haftalık P&L</div><div class="week-cell-val" id="wk-pnl">—</div><div class="week-cell-sub" id="wk-wr">— win rate</div></div>
+        <div class="week-cell"><div class="week-cell-label">Avg RR</div><div class="week-cell-val" id="wk-rr">—</div><div class="week-cell-sub">bu hafta ortalama</div></div>
+        <div class="week-cell"><div class="week-cell-label">Haftalık TP</div><div class="week-cell-val" id="wk-tp">—</div><div class="week-cell-sub">hedef işlem sayısı</div></div>
+      </div>
+
+      <div class="content">
+        <div class="grid-2-1 mb16">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Equity Curve</h3>
+              <div class="chart-tabs">
+                <button class="ctab active" data-range="all">Tümü</button>
+                <button class="ctab" data-range="month">Ay</button>
+                <button class="ctab" data-range="week">Hafta</button>
+              </div>
+            </div>
+            <canvas id="equityChart"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Setup Dağılımı</h3></div>
+            <canvas id="setupChart"></canvas>
+          </div>
+        </div>
+
+        <div class="grid-3 mb24">
+          <div class="panel">
+            <div class="panel-head"><h3>Günlük P&L</h3></div>
+            <canvas id="dailyChart"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Entry Model Başarısı</h3></div>
+            <canvas id="entryModelChart"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Sık Hatalar</h3></div>
+            <canvas id="mistakeChartDash"></canvas>
+          </div>
+        </div>
+
+        <div class="section-label">Son İşlemler</div>
+        <div class="panel" style="padding:0">
+          <div class="trade-list" id="recent-trades"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TRADE LOG ─── -->
+    <div id="page-trades" class="page">
+      <div class="page-header">
+        <div><h1>Trade Log</h1><p class="page-sub">Tüm işlemleriniz</p></div>
+        <div class="header-actions">
+          <input type="text" class="search-input" id="trade-search" placeholder="Sembol, setup ara…" />
+          <select class="filter-select" id="trade-filter-result">
+            <option value="">Tüm Sonuçlar</option>
+            <option value="win">Kazanç</option>
+            <option value="loss">Kayıp</option>
+            <option value="be">Başabaş</option>
+          </select>
+          <select class="filter-select" id="trade-filter-setup">
+            <option value="">Tüm Setup</option>
+            <option value="OB">Order Block</option>
+            <option value="FVG">Fair Value Gap</option>
+            <option value="BRB">Breaker Block</option>
+            <option value="OTE">OTE</option>
+            <option value="MSS">MSS / BOS</option>
+            <option value="Sweep">Liq. Sweep</option>
+            <option value="CISD">CISD</option>
+            <option value="SMT">SMT Div.</option>
+          </select>
+        </div>
+      </div>
+      <div class="content" style="padding-top:0">
+        <div class="panel" style="padding:0">
+          <div class="table-wrapper">
+            <table class="trades-table">
+              <thead>
+                <tr>
+                  <th>Tarih</th><th>Sembol</th><th>Yön</th><th>Setup(lar)</th>
+                  <th>Entry Model</th><th>RR</th><th>P&L</th><th>Sonuç</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="trades-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TRADE EKLE ─── -->
+    <div id="page-add" class="page">
+      <div class="page-header">
+        <div><h1 id="form-title">Trade Ekle</h1><p class="page-sub">Yeni işlem kaydet</p></div>
+      </div>
+      <div class="form-container">
+        <form id="trade-form">
+          <input type="hidden" id="edit-id" />
+
+          <!-- Temel -->
+          <div class="form-section">
+            <div class="form-section-title">Temel Bilgiler</div>
+            <div class="form-grid-3">
+              <div class="form-group">
+                <label>Tarih & Saat</label>
+                <input type="datetime-local" id="f-date" required />
+              </div>
+              <div class="form-group">
+                <label>Sembol</label>
+                <div class="symbol-autocomplete" id="symbol-autocomplete">
+                  <input type="text" id="f-symbol-input" placeholder="EUR, NAS, XAU…" autocomplete="off" />
+                  <div class="symbol-dropdown hidden" id="symbol-dropdown"></div>
+                  <input type="hidden" id="f-symbol" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>HTF Bias</label>
+                <select id="f-htf">
+                  <option value="Bullish">Bullish</option>
+                  <option value="Bearish">Bearish</option>
+                  <option value="Neutral">Nötr</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Yön</label>
+                <div class="direction-btns">
+                  <button type="button" class="dir-btn" data-dir="long">▲ LONG</button>
+                  <button type="button" class="dir-btn" data-dir="short">▼ SHORT</button>
+                </div>
+                <input type="hidden" id="f-direction" required />
+              </div>
+              <div class="form-group">
+                <label>Haftalık TP Hedefi</label>
+                <div class="toggle-row" style="margin-top:9px">
+                  <label class="toggle"><input type="checkbox" id="f-weekly-tp" /><span class="toggle-slider"></span></label>
+                  <span>Bu haftalık hedef trade</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Setup Confluence -->
+          <div class="form-section">
+            <div class="form-section-title">
+              Setup Confluence
+              <span class="hint-text">&nbsp;— birden fazla seçilebilir</span>
+            </div>
+            <div class="setup-checkboxes" id="setup-checkboxes">
+              <label class="setup-cb"><input type="checkbox" value="OB" /><span>Order Block</span></label>
+              <label class="setup-cb"><input type="checkbox" value="FVG" /><span>Fair Value Gap</span></label>
+              <label class="setup-cb"><input type="checkbox" value="BRB" /><span>Breaker Block</span></label>
+              <label class="setup-cb"><input type="checkbox" value="OTE" /><span>OTE (0.62–0.79)</span></label>
+              <label class="setup-cb"><input type="checkbox" value="MSS" /><span>MSS / BOS</span></label>
+              <label class="setup-cb"><input type="checkbox" value="Sweep" /><span>Liq. Sweep</span></label>
+              <label class="setup-cb"><input type="checkbox" value="CISD" /><span>CISD</span></label>
+              <label class="setup-cb"><input type="checkbox" value="SMT" /><span>SMT Div.</span></label>
+              <label class="setup-cb"><input type="checkbox" value="EQL" /><span>Equal H/L</span></label>
+              <label class="setup-cb"><input type="checkbox" value="IFVG" /><span>Inversion FVG</span></label>
+              <label class="setup-cb"><input type="checkbox" value="VP" /><span>Void / PA</span></label>
+              <label class="setup-cb"><input type="checkbox" value="Other" /><span>Diğer</span></label>
+            </div>
+          </div>
+
+          <!-- Entry Model -->
+          <div class="form-section">
+            <div class="form-section-title">Entry Modeli</div>
+            <div class="entry-model-btns" id="entry-model-btns">
+              <button type="button" class="em-btn" data-val="FVG">FVG Fill</button>
+              <button type="button" class="em-btn" data-val="OB">OB Reaction</button>
+              <button type="button" class="em-btn" data-val="Sweep">Sweep & Reverse</button>
+              <button type="button" class="em-btn" data-val="MSS">MSS Confirm</button>
+              <button type="button" class="em-btn" data-val="OTE">OTE Fibonacci</button>
+              <button type="button" class="em-btn" data-val="Aggressive">Aggressive</button>
+              <button type="button" class="em-btn" data-val="Limit">Limit Order</button>
+              <button type="button" class="em-btn" data-val="Stop">Stop Order</button>
+            </div>
+            <input type="hidden" id="f-entry-model" />
+          </div>
+
+          <!-- Fiyat & Risk -->
+          <div class="form-section">
+            <div class="form-section-title">Fiyat & Risk</div>
+            <div class="form-grid-4">
+              <div class="form-group">
+                <label>Giriş</label>
+                <input type="number" id="f-entry" step="any" placeholder="0.00000" required />
+              </div>
+              <div class="form-group">
+                <label>Stop Loss</label>
+                <input type="number" id="f-sl" step="any" placeholder="0.00000" required />
+              </div>
+              <div class="form-group">
+                <label>Take Profit</label>
+                <input type="number" id="f-tp" step="any" placeholder="0.00000" required />
+              </div>
+              <div class="form-group">
+                <label>Risk % (Kasa)</label>
+                <input type="number" id="f-risk-pct" step="0.1" placeholder="1.0" min="0.1" max="10" />
+              </div>
+            </div>
+            <div class="risk-calc-box" id="risk-calc-box">
+              <div class="rc-item"><span class="rc-label">RR</span><span class="rc-val" id="rc-rr">—</span></div>
+              <div class="rc-item"><span class="rc-label">Risk $</span><span class="rc-val" id="rc-risk-usd">—</span></div>
+              <div class="rc-item"><span class="rc-label">Önerilen Lot</span><span class="rc-val gold" id="rc-lot">—</span></div>
+              <div class="rc-item"><span class="rc-label">Max Kazanç</span><span class="rc-val up" id="rc-reward">—</span></div>
+              <div class="rc-alert hidden" id="rc-alert"></div>
+            </div>
+            <div class="form-grid-4" style="margin-top:14px">
+              <div class="form-group">
+                <label>Lot / Pozisyon</label>
+                <input type="number" id="f-lot" step="any" placeholder="0.01" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Sonuç -->
+          <div class="form-section">
+            <div class="form-section-title">Sonuç & Psikoloji</div>
+            <div class="form-grid-4">
+              <div class="form-group">
+                <label>Sonuç</label>
+                <div class="result-btns">
+                  <button type="button" class="res-btn" data-res="win">WIN</button>
+                  <button type="button" class="res-btn" data-res="loss">LOSS</button>
+                  <button type="button" class="res-btn" data-res="be">BE</button>
+                </div>
+                <input type="hidden" id="f-result" />
+              </div>
+              <div class="form-group">
+                <label>P&L ($)</label>
+                <input type="number" id="f-pnl" step="any" placeholder="±0.00" />
+              </div>
+              <div class="form-group">
+                <label>Ruh Hali</label>
+                <div class="emotion-btns" id="emotion-btns">
+                  <button type="button" class="emo-btn" data-val="1">😰</button>
+                  <button type="button" class="emo-btn" data-val="2">😟</button>
+                  <button type="button" class="emo-btn" data-val="3">😐</button>
+                  <button type="button" class="emo-btn" data-val="4">🙂</button>
+                  <button type="button" class="emo-btn" data-val="5">😊</button>
+                </div>
+                <input type="hidden" id="f-emotion" value="3" />
+              </div>
+              <div class="form-group">
+                <label>Kural İhlali</label>
+                <select id="f-mistake" multiple class="multi-select">
+                  <option value="fomo">FOMO girişi</option>
+                  <option value="revenge">Revenge trade</option>
+                  <option value="overleverage">Aşırı lot</option>
+                  <option value="early">Erken giriş</option>
+                  <option value="late">Geç giriş</option>
+                  <option value="no_confluence">Confluence yok</option>
+                  <option value="sl_moved">SL taşıdı</option>
+                  <option value="tp_early">Erken TP</option>
+                  <option value="news">Haberde işlem</option>
+                  <option value="none">İhlal yok</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notlar -->
+          <div class="form-section">
+            <div class="form-section-title">Notlar</div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Trade Planı</label>
+                <textarea id="f-plan" placeholder="Neden bu işleme girdiniz? Confluence'lar neydi?" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Çıkarım / Ders</label>
+                <textarea id="f-lesson" placeholder="Bu işlemden ne öğrendiniz?" rows="3"></textarea>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:14px">
+              <label>Ekran Görüntüsü <span style="color:var(--ghost);font-weight:400;text-transform:none;letter-spacing:0">— sürükle, yapıştır (Ctrl+V) veya seç</span></label>
+              <div class="screenshot-upload-area" id="screenshot-drop-area">
+                <input type="file" id="f-screenshot-file" accept="image/*" style="display:none" />
+                <div id="screenshot-placeholder" class="upload-placeholder">
+                  <div class="upload-icon">📷</div>
+                  <div>Sürükle bırak veya <button type="button" class="upload-link" onclick="document.getElementById('f-screenshot-file').click()">dosya seç</button></div>
+                  <div class="upload-hint">PNG, JPG, WebP</div>
+                </div>
+                <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
+                  <img id="screenshot-preview-img" class="screenshot-preview-thumb" />
+                  <button type="button" class="screenshot-remove" onclick="removeScreenshot()">✕ Kaldır</button>
+                </div>
+              </div>
+              <input type="hidden" id="f-screenshot" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="cancelEdit()">İptal</button>
+            <button type="submit" class="btn-primary">Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ─── KASA & RİSK ─── -->
+    <div id="page-risk" class="page">
+      <div class="page-header">
+        <div><h1>Kasa & Risk</h1><p class="page-sub">Pozisyon hesabı ve risk takibi</p></div>
+      </div>
+
+      <div class="risk-layout">
+        <!-- Kasa istatistikleri -->
+        <div class="risk-stats-row">
+          <div class="risk-stat-cell">
+            <div class="rs-label">Mevcut Bakiye</div>
+            <div class="rs-value" id="rs-balance">—</div>
+          </div>
+          <div class="risk-stat-cell">
+            <div class="rs-label">Ort. Risk / Trade</div>
+            <div class="rs-value" id="rs-avg-risk">—</div>
+          </div>
+          <div class="risk-stat-cell">
+            <div class="rs-label">Beklenen Değer</div>
+            <div class="rs-value" id="rs-ev">—</div>
+          </div>
+          <div class="risk-stat-cell">
+            <div class="rs-label">Toplam Riske Edilen</div>
+            <div class="rs-value down" id="rs-total-risk">—</div>
+          </div>
+        </div>
+
+        <!-- Ayarlar + Hesaplayıcı -->
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Kasa Ayarları</h3></div>
+            <div class="form-grid-2" style="margin-bottom:14px">
+              <div class="form-group">
+                <label>Hesap Adı</label>
+                <input type="text" id="acct-name" placeholder="Demo / Live…" />
+              </div>
+              <div class="form-group">
+                <label>Başlangıç Bakiyesi ($)</label>
+                <input type="number" id="acct-balance" placeholder="10000" step="100" />
+              </div>
+              <div class="form-group">
+                <label>Max Risk / Trade (%)</label>
+                <input type="number" id="acct-risk-pct" placeholder="1" step="0.1" />
+              </div>
+              <div class="form-group">
+                <label>Günlük Max Kayıp (%)</label>
+                <input type="number" id="acct-daily-limit" placeholder="3" step="0.5" />
+              </div>
+            </div>
+            <button class="btn-primary" onclick="saveRiskSettings()">Kaydet</button>
+
+            <div class="data-tools">
+              <div class="data-tools-label">Veri Yönetimi</div>
+              <p class="data-tools-hint">Verilerin tarayıcında saklanır. Düzenli yedek al — bilgisayar değişse bile geri yükleyebilirsin.</p>
+              <div class="data-tools-btns">
+                <button class="btn-gold btn-sm" onclick="exportData()">↓ Yedek Al (.json)</button>
+                <button class="btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">↑ Yedek Yükle</button>
+                <button class="btn-ghost btn-sm" onclick="clearAllData()" style="color:var(--loss);border-color:rgba(232,93,93,.25)">Tümünü Sil</button>
+                <input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="importData(event)" />
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h3>Pozisyon Hesaplayıcı</h3></div>
+            <div class="form-grid-2" style="margin-bottom:14px">
+              <div class="form-group">
+                <label>Sembol</label>
+                <div class="symbol-autocomplete" id="calc-symbol-ac">
+                  <input type="text" id="calc-symbol-input" placeholder="EUR, NAS…" autocomplete="off" />
+                  <div class="symbol-dropdown hidden" id="calc-symbol-dropdown"></div>
+                  <input type="hidden" id="calc-symbol" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Risk %</label>
+                <input type="number" id="calc-risk" step="0.1" placeholder="1.0" min="0.1" max="10" />
+              </div>
+              <div class="form-group">
+                <label>Giriş</label>
+                <input type="number" id="calc-entry" step="any" placeholder="0.00" />
+              </div>
+              <div class="form-group">
+                <label>Stop Loss</label>
+                <input type="number" id="calc-sl" step="any" placeholder="0.00" />
+              </div>
+            </div>
+            <button class="btn-primary" onclick="calcPosition()">Hesapla</button>
+            <div class="pos-result hidden" id="pos-result">
+              <div class="pos-row"><span>Risk $</span><span class="down" id="pr-risk"></span></div>
+              <div class="pos-row"><span>SL Mesafesi</span><span id="pr-pips" style="font-family:'JetBrains Mono',monospace"></span></div>
+              <div class="pos-row"><span>Önerilen Lot</span><span class="gold" id="pr-lot"></span></div>
+              <div class="pos-row"><span>Pip Değeri</span><span id="pr-pipval" style="font-family:'JetBrains Mono',monospace"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tavsiyeler -->
+        <div class="panel">
+          <div class="panel-head"><h3>Risk Tavsiyeleri</h3></div>
+          <div id="advice-list" class="advice-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── HATA ANALİZİ ─── -->
+    <div id="page-mistakes" class="page">
+      <div class="page-header">
+        <div><h1>Hata Analizi</h1><p class="page-sub">Tekrarlanan hatalar ve mali etkileri</p></div>
+      </div>
+      <div class="mistakes-layout">
+        <div class="mistake-cards-row" id="mistake-overview-grid"></div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h3>Hata Maliyeti ($)</h3></div>
+            <canvas id="mistakeCostChart"></canvas>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Haftalık Hata Trendi</h3></div>
+            <canvas id="mistakeTrendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="panel" style="padding:0">
+          <div style="padding:18px 20px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px">
+            <span style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--dim)">Hatalı İşlemler</span>
+            <div class="mistake-filter-row" id="mistake-filter-tabs"></div>
+          </div>
+          <div class="trade-list" id="mistake-trades-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── ANALİTİK ─── -->
+    <div id="page-analytics" class="page">
+      <div class="page-header">
+        <div><h1>Analitik</h1><p class="page-sub">Derinlemesine performans analizi</p></div>
+      </div>
+      <div class="analytics-layout">
+        <div class="analytics-grid">
+          <div class="panel"><div class="panel-head"><h3>Setup Win Rate</h3></div><canvas id="setupWRChart"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>Entry Model Win Rate</h3></div><canvas id="entryWRChart"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>Duygu vs Sonuç</h3></div><canvas id="emotionChart"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>RR Dağılımı</h3></div><canvas id="rrChart"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>Haftalık TP Başarısı</h3></div><canvas id="weeklyTPChart"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>Sembol Performansı</h3></div><canvas id="symbolChart"></canvas></div>
+        </div>
+        <div class="panel insights-section">
+          <h3>İçgörüler</h3>
+          <div id="insights-list" class="insights-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── GÜNLÜK ─── -->
+    <div id="page-journal" class="page">
+      <div class="page-header">
+        <div><h1>Günlük</h1><p class="page-sub">Günlük notlar ve psikoloji takibi</p></div>
+        <button class="btn-primary" onclick="openJournalModal()">+ Yeni Giriş</button>
+      </div>
+      <div class="journal-layout">
+        <div class="journal-list" id="journal-list"></div>
+      </div>
+    </div>
+
+    <!-- ─── TAKVİM ─── -->
+    <div id="page-calendar" class="page">
+      <div class="page-header">
+        <div><h1>Takvim</h1><p class="page-sub">Aylık performans haritası</p></div>
+        <div class="calendar-nav">
+          <button class="btn-icon" id="cal-prev">←</button>
+          <span class="cal-month-label" id="cal-month-label"></span>
+          <button class="btn-icon" id="cal-next">→</button>
+        </div>
+      </div>
+      <div class="calendar-layout">
+        <div id="calendar-grid" class="calendar-grid"></div>
+        <div id="cal-day-detail" class="cal-day-detail hidden"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- Trade detail -->
+<div id="trade-modal" class="modal hidden">
+  <div class="modal-overlay" onclick="closeModal()"></div>
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Journal -->
+<div id="journal-modal" class="modal hidden">
+  <div class="modal-overlay" onclick="closeJournalModal()"></div>
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeJournalModal()">✕</button>
+    <h2 style="font-size:16px;font-weight:600;margin-bottom:20px">Günlük Giriş</h2>
+    <div class="form-grid-2" style="margin-bottom:14px">
+      <div class="form-group"><label>Tarih</label><input type="date" id="j-date" /></div>
+      <div class="form-group"><label>HTF Bias</label>
+        <select id="j-bias">
+          <option value="Bullish">Bullish</option>
+          <option value="Bearish">Bearish</option>
+          <option value="Nötr">Nötr</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Ruh Hali</label>
+      <div class="emotion-btns" id="j-emotion-btns">
+        <button type="button" class="emo-btn" data-val="1">😰</button>
+        <button type="button" class="emo-btn" data-val="2">😟</button>
+        <button type="button" class="emo-btn" data-val="3">😐</button>
+        <button type="button" class="emo-btn" data-val="4">🙂</button>
+        <button type="button" class="emo-btn" data-val="5">😊</button>
+      </div>
+      <input type="hidden" id="j-emotion" value="3" />
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Önemli Seviyeler</label>
+      <input type="text" id="j-levels" placeholder="PWH: 1.0850, EQL: 1.0720…" />
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Haftalık Plan</label>
+      <textarea id="j-plan" rows="3" placeholder="Bu hafta için plan…"></textarea>
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label>Günün Özeti</label>
+      <textarea id="j-summary" rows="3" placeholder="Bugün ne oldu?"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeJournalModal()">İptal</button>
+      <button class="btn-primary" onclick="saveJournal()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirm -->
+<div id="delete-modal" class="modal hidden">
+  <div class="modal-overlay" onclick="closeDeleteModal()"></div>
+  <div class="modal-content small">
+    <h3 style="font-size:15px;font-weight:600;margin-bottom:8px">Silmek istediğinize emin misiniz?</h3>
+    <p style="font-size:12px;color:var(--dim);margin-bottom:20px">Bu işlem geri alınamaz.</p>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeDeleteModal()">İptal</button>
+      <button class="btn-danger" id="confirm-delete-btn">Sil</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
