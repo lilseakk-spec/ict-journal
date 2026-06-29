@@ -574,7 +574,8 @@ function renderWeekHub() {
   const wkWR     = wkCount ? Math.round(wkWins/wkCount*100) : 0;
   const wkR      = wkTrades.reduce((s,t)=>s+tradeR(t),0);
   const wkTP     = wkTrades.filter(t=>t.weeklyTP).length;
-  const daysLeft = Math.max(0, wkEnd.diff(dayjs(), 'day'));
+  const wkClean  = wkTrades.filter(t => !(t.mistakes||[]).some(m => m && m!=='none')).length;
+  const wkDisc   = wkCount ? Math.round(wkClean/wkCount*100) : 0;
 
   const goal = riskSettings.weeklyGoal || 0;
 
@@ -614,7 +615,7 @@ function renderWeekHub() {
   setVal('wh-wr', wkCount ? '%'+wkWR : '—', wkCount ? (wkWR>=50?'up':'down') : '');
   setVal('wh-r', wkCount ? (wkR>=0?'+':'')+wkR.toFixed(1)+'R' : '—', wkCount ? (wkR>=0?'up':'down') : '');
   setVal('wh-tp', wkTP, wkTP>0?'gold':'');
-  setVal('wh-days', daysLeft+'g');
+  setVal('wh-disc', wkCount ? '%'+wkDisc : '—', wkCount ? (wkDisc>=70?'up':wkDisc>=40?'gold':'down') : '');
 
   return wkCount;
 }
