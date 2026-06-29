@@ -9,3 +9,4 @@ node_modules/
 
 # Local launcher (Windows-only, not needed online)
 Başlat.bat
+*.lnk
