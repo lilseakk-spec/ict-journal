@@ -1,7 +1,12 @@
 /* ICT Trade Journal — service worker
-   Cache-first with background refresh. Lets the app load
-   and run fully offline after the first visit. */
-const CACHE = 'ict-journal-v1';
+   Strategy:
+   - Same-origin app files (HTML/CSS/JS): NETWORK-FIRST.
+     Online → always the latest version (auto-update, no reinstall).
+     Offline → falls back to the last cached version.
+   - Cross-origin (CDN libs, fonts): CACHE-FIRST (version-pinned URLs).
+   NOTE: User data lives in localStorage and is NEVER touched by this
+   cache. Updating the app never deletes trades, journals or settings. */
+const CACHE = 'ict-journal-v2';
 const CORE = [
   './', './index.html', './style.css', './app.js',
   './manifest.json', './icon.svg',
@@ -23,16 +28,34 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(resp => {
-        if (resp && (resp.ok || resp.type === 'opaque')) {
+  const url = new URL(e.request.url);
+  const sameOrigin = url.origin === self.location.origin;
+
+  if (sameOrigin) {
+    // Network-first — fresh when online, cached fallback when offline.
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if (resp && resp.ok) {
           const copy = resp.clone();
           caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
         }
         return resp;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+      }).catch(() =>
+        caches.match(e.request).then(c => c || caches.match('./index.html'))
+      )
+    );
+  } else {
+    // Cross-origin — cache-first (CDN URLs are version-pinned).
+    e.respondWith(
+      caches.match(e.request).then(cached =>
+        cached || fetch(e.request).then(resp => {
+          if (resp && (resp.ok || resp.type === 'opaque')) {
+            const copy = resp.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+          }
+          return resp;
+        }).catch(() => cached)
+      )
+    );
+  }
 });
