@@ -6,10 +6,10 @@
    - Cross-origin (CDN libs, fonts): CACHE-FIRST (version-pinned URLs).
    NOTE: User data lives in localStorage and is NEVER touched by this
    cache. Updating the app never deletes trades, journals or settings. */
-const CACHE = 'ict-journal-v2';
+const CACHE = 'ict-journal-v3';
 const CORE = [
   './', './index.html', './style.css', './app.js',
-  './manifest.json', './icon.svg',
+  './manifest.json', './icon.svg', './icon-192.png', './icon-512.png',
 ];
 
 self.addEventListener('install', e => {
