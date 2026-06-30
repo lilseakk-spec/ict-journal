@@ -727,12 +727,12 @@ function tradeRowHTML(t) {
   const setupBadges = (t.setups||[t.setup]).filter(Boolean).slice(0,2).map(s=>`<span class="badge setup">${s}</span>`).join(' ');
   return `
   <div class="trade-row ${t.result}" onclick="openTradeModal('${t.id}')">
-    <span style="color:var(--text3);font-size:11px">${dayjs(t.date).format('DD/MM/YY HH:mm')}</span>
+    <span style="color:var(--dim);font-size:11px">${dayjs(t.date).format('DD/MM/YY HH:mm')}</span>
     <span style="font-weight:700;color:var(--text)">${t.symbol}</span>
     <span class="badge ${t.direction}">${(t.direction||'').toUpperCase()}</span>
     <span>${setupBadges}</span>
     <span class="badge em">${t.entryModel||'—'}</span>
-    <span style="color:var(--accent2)">1:${t.rr}</span>
+    <span style="color:var(--gold)">1:${t.rr}</span>
     <span class="${pnlCls}">${fmtPNL(t.pnl)}</span>
     <span class="badge ${t.result}-badge">${resLabel(t.result)}</span>
   </div>`;
@@ -748,7 +748,7 @@ function renderTradeLog() {
   if (fr) rows = rows.filter(t=>t.result===fr);
   if (fs) rows = rows.filter(t=>(t.setups||[]).includes(fs));
   const tbody = document.getElementById('trades-tbody');
-  if (!rows.length) { tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text3)">Trade bulunamadı</td></tr>`; return; }
+  if (!rows.length) { tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--dim)">Trade bulunamadı</td></tr>`; return; }
   tbody.innerHTML = rows.map(t => {
     const pnlCls = t.pnl>0?'pnl-positive':t.pnl<0?'pnl-negative':'pnl-zero';
     const setupBadges = (t.setups||[t.setup]).filter(Boolean).map(s=>`<span class="badge setup">${s}</span>`).join(' ');
@@ -758,7 +758,7 @@ function renderTradeLog() {
       <td><span class="badge ${t.direction}">${(t.direction||'').toUpperCase()}</span></td>
       <td>${setupBadges}</td>
       <td><span class="badge em">${t.entryModel||'—'}</span></td>
-      <td style="color:var(--accent2)">1:${t.rr}</td>
+      <td style="color:var(--gold)">1:${t.rr}</td>
       <td class="${pnlCls}">${fmtPNL(t.pnl)}</td>
       <td><span class="badge ${t.result}-badge">${resLabel(t.result)}</span></td>
       <td><div class="action-btns">
@@ -1289,21 +1289,21 @@ function renderJournal() {
   const sorted = [...journals].sort((a,b)=>new Date(b.date)-new Date(a.date));
   if (!sorted.length) { el.innerHTML=emptyState('📓','Günlük boş','Her trading günü bir not bırakın — piyasa gözlemleri, duygular, öğrenilenler.'); return; }
   const emos = ['','😰','😟','😐','🙂','😊'];
-  const bColor = { Bullish:'var(--green)', Bearish:'var(--red)', Nötr:'var(--yellow)' };
+  const biasCls = { Bullish:'bull', Bearish:'bear', Nötr:'neut' };
   el.innerHTML = sorted.map(j => `
-    <div class="journal-card">
+    <div class="journal-card ${biasCls[j.bias]||'neut'}">
       <div class="journal-card-header">
         <div class="journal-card-date">${dayjs(j.date).format('DD MMMM YYYY, dddd')}</div>
         <div class="journal-card-meta">
-          <span class="badge" style="color:${bColor[j.bias]||'var(--text2)'};border:1px solid;border-color:currentColor;background:transparent">${j.bias}</span>
-          <span style="font-size:20px">${emos[j.emotion]||'😐'}</span>
+          ${biasBadge(j.bias)}
+          <span style="font-size:20px" title="Ruh hali">${emos[j.emotion]||'😐'}</span>
           <button class="btn-icon-sm delete" onclick="deleteJournal('${j.id}')">🗑</button>
         </div>
       </div>
       <div class="journal-card-body">
-        ${j.levels?`<div class="journal-card-section"><label>Önemli Seviyeler</label><span style="color:var(--accent2);font-family:monospace">${j.levels}</span></div>`:''}
-        ${j.plan?`<div class="journal-card-section"><label>Haftalık Plan</label><p>${j.plan}</p></div>`:''}
-        ${j.summary?`<div class="journal-card-section"><label>Özet</label><p>${j.summary}</p></div>`:''}
+        ${j.levels?`<div class="journal-card-section"><label>Önemli Seviyeler</label><span style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:12px">${escapeHtml(j.levels)}</span></div>`:''}
+        ${j.plan?`<div class="journal-card-section"><label>Haftalık Plan</label><p>${escapeHtml(j.plan)}</p></div>`:''}
+        ${j.summary?`<div class="journal-card-section"><label>Özet</label><p>${escapeHtml(j.summary)}</p></div>`:''}
       </div>
     </div>`).join('');
 }
@@ -1357,10 +1357,11 @@ function renderCoinNotes() {
     const la = lastUpdate(a), lb = lastUpdate(b);
     return new Date(lb?lb.date:b.createdAt) - new Date(la?la.date:a.createdAt);
   });
+  const biasCls = { Bullish:'bull', Bearish:'bear', Nötr:'neut' };
   el.innerHTML = sorted.map(c => {
     const last = lastUpdate(c);
     const snippet = last ? escapeHtml(last.text) : '<span style="color:var(--dim)">Henüz not yok</span>';
-    return `<div class="coin-card" onclick="openCoinDetail('${c.id}')">
+    return `<div class="coin-card ${biasCls[c.bias]||'neut'}" onclick="openCoinDetail('${c.id}')">
       <div class="coin-card-top">
         <span class="coin-card-sym">${c.symbol}</span>
         ${biasBadge(c.bias)}
@@ -1517,7 +1518,7 @@ function showCalDay(ds) {
   detail.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h3>${dayjs(ds).format('DD MMMM YYYY')}</h3>
-      <span style="font-weight:700;color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}${pnl.toFixed(2)}$</span>
+      <span style="font-weight:700;color:${pnl>=0?'var(--win)':'var(--loss)'}">${pnl>=0?'+':''}${pnl.toFixed(2)}$</span>
     </div>
     <div class="recent-trades-list">${dt.map(tradeRowHTML).join('')}</div>`;
 }
