@@ -4,6 +4,7 @@ dayjs.extend(window.dayjs_plugin_isoWeek);
 // ===== STATE =====
 let trades   = JSON.parse(localStorage.getItem('ict_trades')   || '[]');
 let journals = JSON.parse(localStorage.getItem('ict_journals') || '[]');
+let coinNotes = JSON.parse(localStorage.getItem('ict_coinnotes') || '[]');
 let riskSettings = JSON.parse(localStorage.getItem('ict_risk') || '{}');
 let charts = {};
 let equityRange = 'all';
@@ -79,7 +80,8 @@ const SYMBOLS = [
 const MISTAKE_LABELS = {
   fomo:'FOMO Girişi', revenge:'Revenge Trade', overleverage:'Aşırı Lot',
   early:'Erken Giriş', late:'Geç Giriş', no_confluence:'Confluence Yok',
-  sl_moved:'SL Taşıdı', tp_early:'Erken TP', news:'Haberde İşlem'
+  sl_moved:'SL Taşıdı', tp_early:'Erken TP', news:'Haberde İşlem',
+  no_stop:'Stop Koyulmadı', chase:'Fiyat Kovaladı', no_plan:'Plansız Giriş'
 };
 
 // ===== INIT =====
@@ -91,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupKeyboard();
   setupSymbolAC('symbol-autocomplete', 'f-symbol-input', 'symbol-dropdown', 'f-symbol');
   setupSymbolAC('calc-symbol-ac', 'calc-symbol-input', 'calc-symbol-dropdown', 'calc-symbol');
+  setupSymbolAC('coin-symbol-ac', 'coin-symbol-input', 'coin-symbol-dropdown', 'coin-symbol');
+  setupCoinNotes();
 
   document.getElementById('header-date').textContent =
     dayjs().format('DD MMMM YYYY').toUpperCase();
@@ -160,9 +164,17 @@ function setupKeyboard() {
     if (['input','textarea','select'].includes(tag) || e.target.isContentEditable) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+    // Lightbox controls take priority when open
+    const lb = document.getElementById('lightbox');
+    if (lb && lb.classList.contains('open')) {
+      if (e.key === 'Escape') { closeLightbox(); return; }
+      if (e.key === 'ArrowLeft')  { lbStep(-1); return; }
+      if (e.key === 'ArrowRight') { lbStep(1);  return; }
+    }
     // Esc closes any open modal
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
+      document.getElementById('shortcut-help')?.remove();
       return;
     }
     // 1-8 → pages
@@ -209,6 +221,7 @@ function refreshAll() {
 function save() {
   localStorage.setItem('ict_trades', JSON.stringify(trades));
   localStorage.setItem('ict_journals', JSON.stringify(journals));
+  localStorage.setItem('ict_coinnotes', JSON.stringify(coinNotes));
 }
 
 // ===== SYMBOL AUTOCOMPLETE =====
@@ -296,6 +309,18 @@ function setupForm() {
     })
   );
 
+  // Mistake pills — "İhlal Yok" is mutually exclusive with the rest
+  document.querySelectorAll('#mistake-checkboxes input').forEach(cb =>
+    cb.addEventListener('change', () => {
+      if (cb.value === 'none' && cb.checked) {
+        document.querySelectorAll('#mistake-checkboxes input').forEach(o => { if (o !== cb) o.checked = false; });
+      } else if (cb.value !== 'none' && cb.checked) {
+        const none = document.querySelector('#mistake-checkboxes input[value="none"]');
+        if (none) none.checked = false;
+      }
+    })
+  );
+
   setupEmoBtns('#emotion-btns', 'f-emotion');
   document.getElementById('trade-form').addEventListener('submit', saveTrade);
 }
@@ -320,22 +345,19 @@ function updateRiskCalc() {
   let riskPct   = parseFloat(riskInput.value) || riskSettings.riskPct || 1;
   const balance = riskSettings.balance || 0;
 
-  // Cap at 10%
-  if (riskPct > 10) { riskPct = 10; riskInput.value = 10; }
-
   const rrEl    = document.getElementById('rc-rr');
   const riskEl  = document.getElementById('rc-risk-usd');
   const lotEl   = document.getElementById('rc-lot');
   const rewardEl= document.getElementById('rc-reward');
   const alertEl = document.getElementById('rc-alert');
 
-  // Risk level warning
+  // Risk level warning — never blocks input, only informs.
   const maxSafe = riskSettings.maxRisk || 2;
   if (riskPct > maxSafe) {
-    const lvl = riskPct >= 5 ? 'danger' : 'warn';
-    const msg = riskPct >= 5
-      ? `⚠️ Çok yüksek risk! %${riskPct} kasa kurallarını ihlal ediyor.`
-      : `⚠️ Risk oranı yüksek (%${riskPct}). Önerilen maks: %${maxSafe}`;
+    const lvl = riskPct >= 10 ? 'danger' : 'warn';
+    const msg = riskPct >= 10
+      ? `🚨 Aşırı risk! %${riskPct} — bu işlem kasanın %${riskPct}'ini riske atıyor. Üst üste birkaç kayıp hesabı bitirir.`
+      : `⚠️ Yüksek risk: %${riskPct} (önerilen maks %${maxSafe}). Emin değilsen pozisyonu küçült.`;
     alertEl.textContent = msg;
     alertEl.className   = `rc-alert rc-alert-${lvl}`;
     alertEl.classList.remove('hidden');
@@ -401,8 +423,8 @@ function saveTrade(e) {
     ? parseFloat((Math.abs(tp - entry) / riskPip).toFixed(2)) : 0;
 
   const mistakes = Array.from(
-    document.getElementById('f-mistake').selectedOptions
-  ).map(o => o.value);
+    document.querySelectorAll('#mistake-checkboxes input:checked')
+  ).map(cb => cb.value);
 
   const trade = {
     id:          id || Date.now().toString(),
@@ -421,7 +443,8 @@ function saveTrade(e) {
     mistakes,
     plan:        document.getElementById('f-plan').value,
     lesson:      document.getElementById('f-lesson').value,
-    screenshot:  document.getElementById('f-screenshot').value,
+    screenshots: [...formShots],
+    screenshot:  formShots[0] || '',   // backward-compat
     weeklyTP:    document.getElementById('f-weekly-tp').checked,
   };
 
@@ -446,6 +469,7 @@ function resetForm() {
   document.getElementById('f-symbol').value = '';
   document.getElementById('f-symbol-input').value = '';
   document.querySelectorAll('#setup-checkboxes input').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#mistake-checkboxes input').forEach(cb => cb.checked = false);
   document.getElementById('f-date').value = dayjs().format('YYYY-MM-DDTHH:mm');
   ['rc-rr','rc-risk-usd','rc-lot','rc-reward'].forEach(id => document.getElementById(id).textContent = '—');
   resetScreenshot();
@@ -485,20 +509,22 @@ function editTrade(id) {
     cb.checked = (t.setups || []).includes(cb.value)
   );
 
-  const sel = document.getElementById('f-mistake');
-  Array.from(sel.options).forEach(o => o.selected = (t.mistakes || []).includes(o.value));
+  document.querySelectorAll('#mistake-checkboxes input').forEach(cb =>
+    cb.checked = (t.mistakes || []).includes(cb.value)
+  );
 
-  if (t.screenshot) {
-    document.getElementById('f-screenshot').value = t.screenshot;
-    document.getElementById('screenshot-preview-img').src = t.screenshot;
-    document.getElementById('screenshot-placeholder').classList.add('hidden');
-    document.getElementById('screenshot-preview-wrap').classList.remove('hidden');
-  } else {
-    resetScreenshot();
-  }
+  formShots = tradeShots(t);
+  renderShotThumbs();
 
   updateRiskCalc();
   goToPage('add');
+}
+
+// Normalize a trade's images to an array (handles old single-screenshot trades).
+function tradeShots(t) {
+  if (Array.isArray(t.screenshots) && t.screenshots.length) return [...t.screenshots];
+  if (t.screenshot) return [t.screenshot];
+  return [];
 }
 
 function confirmDelete(id) {
@@ -744,45 +770,119 @@ function renderTradeLog() {
   }).join('');
 }
 
-// ===== TRADE MODAL =====
+// ===== TRADE DETAIL (full-page report) =====
+let detailReturnPage = 'trades';
+
 function openTradeModal(id) {
   const t = trades.find(t=>t.id===id);
   if (!t) return;
-  const pnlCls = t.pnl>0?'green':t.pnl<0?'red':'';
-  const emos = ['','😰','😟','😐','🙂','😊'];
-  const setupBadges = (t.setups||[t.setup]).filter(Boolean).map(s=>`<span class="badge setup">${s}</span>`).join(' ');
-  const mistakes = (t.mistakes||[]).filter(m=>m!=='none').map(m=>MISTAKE_LABELS[m]||m).join(', ')||'Yok';
-  document.getElementById('modal-body').innerHTML = `
-  <div class="trade-detail">
-    <div class="trade-detail-header">
-      <div>
-        <div class="trade-detail-title">${t.symbol} <span class="badge ${t.direction}">${(t.direction||'').toUpperCase()}</span></div>
-        <div style="color:var(--text3);font-size:12px;margin-top:4px">${dayjs(t.date).format('DD MMMM YYYY, HH:mm')} • ${t.htf||''} HTF</div>
-      </div>
-      <div style="text-align:right">
-        <div class="stat-value ${pnlCls}" style="font-size:20px">${fmtPNL(t.pnl)}</div>
-        <span class="badge ${t.result}-badge" style="font-size:12px">${resLabel(t.result)}</span>
-      </div>
-    </div>
-    <div class="trade-detail-grid">
-      <div class="detail-item" style="grid-column:1/-1"><label>Setup Confluence</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${setupBadges}</div></div>
-      <div class="detail-item"><label>Entry Model</label><div class="val"><span class="badge em">${t.entryModel||'—'}</span></div></div>
-      <div class="detail-item"><label>Risk/Reward</label><div class="val" style="color:var(--accent2)">1:${t.rr}</div></div>
-      <div class="detail-item"><label>Giriş</label><div class="val">${t.entry}</div></div>
-      <div class="detail-item"><label>Stop Loss</label><div class="val red">${t.sl}</div></div>
-      <div class="detail-item"><label>Take Profit</label><div class="val green">${t.tp}</div></div>
-      <div class="detail-item"><label>Lot</label><div class="val">${t.lot||'—'}</div></div>
-      <div class="detail-item"><label>Psikoloji</label><div class="val" style="font-size:22px">${emos[t.emotion]||'😐'}</div></div>
-      <div class="detail-item"><label>Haftalık TP</label><div class="val">${t.weeklyTP?'✅ Evet':'❌ Hayır'}</div></div>
-      <div class="detail-item" style="grid-column:1/-1"><label>Hatalar</label><div class="val" style="font-size:12px;color:${mistakes==='Yok'?'var(--green)':'var(--red)'}">${mistakes}</div></div>
-    </div>
-    ${t.plan?`<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Trade Planı</div><div class="detail-notes">${t.plan}</div></div>`:''}
-    ${t.lesson?`<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Ders / Çıkarım</div><div class="detail-notes">${t.lesson}</div></div>`:''}
-    ${t.screenshot?`<div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Grafik</div><img src="${t.screenshot}" class="screenshot-modal" onerror="this.style.display='none'" /></div>`:''}
-  </div>`;
-  document.getElementById('trade-modal').classList.remove('hidden');
+  const active = document.querySelector('.page.active');
+  if (active && active.id !== 'page-trade-detail') detailReturnPage = active.id.replace('page-','');
+  renderTradeDetail(t);
+  goToPage('trade-detail');
 }
-function closeModal() { document.getElementById('trade-modal').classList.add('hidden'); }
+function closeModal() { document.getElementById('trade-modal')?.classList.add('hidden'); }
+
+function renderTradeDetail(t) {
+  const emos = ['','😰','😟','😐','🙂','😊'];
+  const emoLabels = ['','Çok kötü','Endişeli','Nötr','İyi','Çok iyi'];
+  const dirCls = t.direction === 'long' ? 'long' : 'short';
+  const pnlCls = t.pnl>0?'up':t.pnl<0?'down':'';
+  const setupBadges = (t.setups||[t.setup]).filter(Boolean)
+    .map(s=>`<span class="badge setup">${s}</span>`).join(' ') || '<span style="color:var(--dim);font-size:12px">—</span>';
+  const mlist = (t.mistakes||[]).filter(m=>m && m!=='none');
+  const shots = tradeShots(t);
+  const rVal = tradeR(t);
+
+  // Price ladder — sort entry/sl/tp by price descending for a real ladder
+  const rows = [
+    { label:'Take Profit', v:t.tp,    role:'tp' },
+    { label:'Giriş',       v:t.entry, role:'entry' },
+    { label:'Stop Loss',   v:t.sl,    role:'sl' },
+  ].filter(r => r.v != null && r.v !== '' && !isNaN(r.v))
+   .sort((a,b)=> b.v - a.v);
+  const ladder = rows.map(r =>
+    `<div class="tr-rung ${r.role}">
+       <span class="tr-rung-label">${r.label}</span>
+       <span class="tr-rung-price">${r.v}</span>
+     </div>`).join('');
+
+  document.getElementById('trade-detail-body').innerHTML = `
+  <div class="tr-report">
+    <div class="tr-bar">
+      <button class="tr-back" onclick="goToPage(detailReturnPage)">← Geri</button>
+      <div class="tr-bar-actions">
+        <button class="btn-secondary btn-sm" onclick="editTrade('${t.id}')">✏️ Düzenle</button>
+        <button class="btn-ghost btn-sm" onclick="confirmDelete('${t.id}')" style="color:var(--loss);border-color:rgba(232,93,93,.25)">🗑 Sil</button>
+      </div>
+    </div>
+
+    <div class="tr-head">
+      <div>
+        <div class="tr-symbol">${t.symbol} <span class="badge ${dirCls}">${(t.direction||'').toUpperCase()}</span></div>
+        <div class="tr-sub">${dayjs(t.date).format('DD MMMM YYYY · HH:mm')} &nbsp;·&nbsp; ${t.htf||'—'} HTF &nbsp;·&nbsp; ${t.entryModel||'—'}</div>
+        <div class="tr-confluence">${setupBadges}</div>
+      </div>
+      <div class="tr-head-right">
+        <div class="tr-pnl ${pnlCls}">${fmtPNL(t.pnl)}</div>
+        <div class="tr-result"><span class="badge ${t.result}-badge">${resLabel(t.result)}</span>
+          <span class="tr-rmult ${rVal>=0?'up':'down'}">${rVal>=0?'+':''}${rVal.toFixed(2)}R</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tr-grid">
+      <div class="tr-panel tr-ladder-panel">
+        <div class="tr-panel-title">Pozisyon Kurgusu</div>
+        <div class="tr-ladder">${ladder || '<span style="color:var(--dim)">Fiyat girilmemiş</span>'}</div>
+        <div class="tr-rr-badge">Risk / Reward &nbsp; <b>1:${t.rr||'—'}</b></div>
+      </div>
+
+      <div class="tr-panel">
+        <div class="tr-panel-title">Metrikler</div>
+        <div class="tr-metrics">
+          <div class="tr-metric"><span>R Sonuç</span><b class="${rVal>=0?'up':'down'}">${rVal>=0?'+':''}${rVal.toFixed(2)}R</b></div>
+          <div class="tr-metric"><span>Risk %</span><b>${t.riskPct!=null?'%'+t.riskPct:'—'}</b></div>
+          <div class="tr-metric"><span>Lot</span><b>${t.lot||'—'}</b></div>
+          <div class="tr-metric"><span>Ruh Hali</span><b title="${emoLabels[t.emotion]||''}">${emos[t.emotion]||'😐'}</b></div>
+          <div class="tr-metric"><span>Haftalık TP</span><b>${t.weeklyTP?'<span class="up">✓ Evet</span>':'<span style="color:var(--dim)">Hayır</span>'}</b></div>
+          <div class="tr-metric"><span>P&L</span><b class="${pnlCls}">${fmtPNL(t.pnl)}</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tr-panel">
+      <div class="tr-panel-title">Kural İhlali</div>
+      ${mlist.length
+        ? `<div class="tr-mistakes">${mlist.map(m=>`<span class="badge loss-badge">${MISTAKE_LABELS[m]||m}</span>`).join(' ')}</div>`
+        : `<div class="tr-clean">✓ Temiz işlem — kurallara uyuldu</div>`}
+    </div>
+
+    ${(t.plan||t.lesson) ? `
+    <div class="tr-notes-grid">
+      ${t.plan?`<div class="tr-panel"><div class="tr-panel-title">Trade Planı</div><p class="tr-note-text">${escapeHtml(t.plan)}</p></div>`:''}
+      ${t.lesson?`<div class="tr-panel"><div class="tr-panel-title">Ders / Çıkarım</div><p class="tr-note-text">${escapeHtml(t.lesson)}</p></div>`:''}
+    </div>` : ''}
+
+    ${shots.length ? `
+    <div class="tr-panel">
+      <div class="tr-panel-title">Grafikler <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— ${shots.length} görsel, büyütmek için tıkla</span></div>
+      <div class="tr-gallery">
+        ${shots.map((src,i)=>`<div class="tr-shot"><img src="${src}" onclick='openTradeLightbox(${i}, ${JSON.stringify(shots.length)})' loading="lazy" /><span class="shot-num">${i+1}</span></div>`).join('')}
+      </div>
+    </div>` : ''}
+  </div>`;
+
+  // Stash this trade's images for the lightbox
+  detailShots = shots;
+}
+
+let detailShots = [];
+function openTradeLightbox(i) { openLightbox(i, detailShots); }
+
+function escapeHtml(s) {
+  return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
 
 // ===== KASA & RİSK =====
 function saveRiskSettings() {
@@ -810,11 +910,13 @@ function loadRiskSettings() {
 }
 
 function clearAllData() {
-  if (!confirm('TÜM trade verileri ve günlük girişleri silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?')) return;
-  trades   = [];
-  journals = [];
+  if (!confirm('TÜM trade verileri, günlük girişleri ve coin notları silinecek. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?')) return;
+  trades    = [];
+  journals  = [];
+  coinNotes = [];
   localStorage.removeItem('ict_trades');
   localStorage.removeItem('ict_journals');
+  localStorage.removeItem('ict_coinnotes');
   save();
   refreshAll();
   renderDashboard();
@@ -829,6 +931,7 @@ function exportData() {
     exportedAt: new Date().toISOString(),
     trades,
     journals,
+    coinNotes,
     riskSettings,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
@@ -850,11 +953,13 @@ function importData(event) {
       if (!Array.isArray(data.trades)) throw new Error('Geçersiz yedek dosyası');
       const tCount = data.trades.length;
       const jCount = (data.journals || []).length;
-      if (!confirm(`Yedek yüklenecek:\n• ${tCount} trade\n• ${jCount} günlük girişi\n\nMevcut verilerin üzerine yazılacak. Devam edilsin mi?`)) {
+      const cCount = (data.coinNotes || []).length;
+      if (!confirm(`Yedek yüklenecek:\n• ${tCount} trade\n• ${jCount} günlük girişi\n• ${cCount} coin notu\n\nMevcut verilerin üzerine yazılacak. Devam edilsin mi?`)) {
         event.target.value = ''; return;
       }
-      trades   = data.trades;
-      journals = data.journals || [];
+      trades    = data.trades;
+      journals  = data.journals || [];
+      coinNotes = data.coinNotes || [];
       if (data.riskSettings && Object.keys(data.riskSettings).length) {
         riskSettings = data.riskSettings;
         localStorage.setItem('ict_risk', JSON.stringify(riskSettings));
@@ -877,7 +982,6 @@ function calcPosition() {
   const sl     = parseFloat(document.getElementById('calc-sl').value);
   const riskInput = document.getElementById('calc-risk');
   let risk     = parseFloat(riskInput.value) || riskSettings.riskPct || 1;
-  if (risk > 10) { risk = 10; riskInput.value = 10; }
   const balance= riskSettings.balance || 0;
   const symbol = document.getElementById('calc-symbol').value;
 
@@ -1206,6 +1310,176 @@ function renderJournal() {
 
 function deleteJournal(id) { journals=journals.filter(j=>j.id!==id); save(); renderJournal(); }
 
+// ===== COIN ANALİZ NOTLARI =====
+let coinDetailId = null;
+
+function setupCoinNotes() {
+  document.querySelectorAll('#journal-seg .seg-btn').forEach(b =>
+    b.addEventListener('click', () => switchJournalTab(b.dataset.tab))
+  );
+  setupBiasBtns('#coin-bias-btns', 'coin-bias');
+}
+
+function setupBiasBtns(sel, hiddenId) {
+  document.querySelectorAll(`${sel} .bias-btn`).forEach(btn =>
+    btn.addEventListener('click', () => {
+      document.querySelectorAll(`${sel} .bias-btn`).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(hiddenId).value = btn.dataset.bias;
+    })
+  );
+}
+
+function switchJournalTab(tab) {
+  document.querySelectorAll('#journal-seg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('tab-daily').classList.toggle('hidden', tab !== 'daily');
+  document.getElementById('tab-coins').classList.toggle('hidden', tab !== 'coins');
+  document.getElementById('journal-add-btn').style.display = tab === 'daily' ? '' : 'none';
+  if (tab === 'coins') renderCoinNotes(); else renderJournal();
+}
+
+function biasBadge(bias) {
+  return `<span class="bias-badge bias-${bias||'Nötr'}">${bias||'Nötr'}</span>`;
+}
+
+function lastUpdate(c) {
+  if (!c.updates || !c.updates.length) return null;
+  return [...c.updates].sort((a,b)=> new Date(b.date)-new Date(a.date))[0];
+}
+
+function renderCoinNotes() {
+  const el = document.getElementById('coin-grid');
+  if (!coinNotes.length) {
+    el.innerHTML = emptyState('📊','Takip listesi boş','Bir coin ekle ve analiz notunu yaz. Her hafta güncelleyerek fikrinin nasıl değiştiğini izle.',{fn:'openCoinModal()',label:'+ Coin Ekle'});
+    return;
+  }
+  const sorted = [...coinNotes].sort((a,b)=>{
+    const la = lastUpdate(a), lb = lastUpdate(b);
+    return new Date(lb?lb.date:b.createdAt) - new Date(la?la.date:a.createdAt);
+  });
+  el.innerHTML = sorted.map(c => {
+    const last = lastUpdate(c);
+    const snippet = last ? escapeHtml(last.text) : '<span style="color:var(--dim)">Henüz not yok</span>';
+    return `<div class="coin-card" onclick="openCoinDetail('${c.id}')">
+      <div class="coin-card-top">
+        <span class="coin-card-sym">${c.symbol}</span>
+        ${biasBadge(c.bias)}
+      </div>
+      <div class="coin-card-snippet">${snippet}</div>
+      <div class="coin-card-foot">
+        <span class="coin-card-meta">${last ? dayjs(last.date).format('DD MMM YYYY') : '—'}</span>
+        <span class="coin-card-count">${(c.updates||[]).length} güncelleme</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCoinModal() {
+  document.getElementById('coin-symbol').value = '';
+  document.getElementById('coin-symbol-input').value = '';
+  document.getElementById('coin-bias').value = 'Nötr';
+  document.getElementById('coin-note').value = '';
+  document.querySelectorAll('#coin-bias-btns .bias-btn').forEach(b => b.classList.toggle('active', b.dataset.bias === 'Nötr'));
+  document.getElementById('coin-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('coin-symbol-input').focus(), 50);
+}
+function closeCoinModal() { document.getElementById('coin-modal').classList.add('hidden'); }
+
+function saveCoin() {
+  const symbol = document.getElementById('coin-symbol').value
+    || document.getElementById('coin-symbol-input').value.trim().toUpperCase();
+  if (!symbol) { alert('Sembol seçin'); return; }
+  const bias = document.getElementById('coin-bias').value || 'Nötr';
+  const note = document.getElementById('coin-note').value.trim();
+
+  let coin = coinNotes.find(c => c.symbol === symbol);
+  if (!coin) {
+    coin = { id: Date.now().toString(), symbol, bias, updates: [], createdAt: new Date().toISOString() };
+    coinNotes.push(coin);
+  }
+  coin.bias = bias;
+  if (note) coin.updates.push({ id: Date.now().toString(), date: dayjs().format('YYYY-MM-DD'), bias, text: note });
+  save();
+  closeCoinModal();
+  renderCoinNotes();
+}
+
+function openCoinDetail(id) {
+  const c = coinNotes.find(x => x.id === id);
+  if (!c) return;
+  coinDetailId = id;
+  renderCoinDetail(c);
+  document.getElementById('coin-detail-modal').classList.remove('hidden');
+}
+function closeCoinDetail() { document.getElementById('coin-detail-modal').classList.add('hidden'); coinDetailId = null; }
+
+function renderCoinDetail(c) {
+  const updates = [...(c.updates||[])].sort((a,b)=> new Date(b.date)-new Date(a.date));
+  document.getElementById('coin-detail-body').innerHTML = `
+    <div class="coin-detail-head">
+      <span class="coin-detail-sym">${c.symbol}</span>
+      ${biasBadge(c.bias)}
+      <button class="btn-ghost btn-sm" style="margin-left:auto;color:var(--loss);border-color:rgba(232,93,93,.25)" onclick="deleteCoin('${c.id}')">🗑 Coini Sil</button>
+    </div>
+    <div class="coin-detail-sub">${(c.updates||[]).length} analiz güncellemesi · ${dayjs(c.createdAt).format('DD MMM YYYY')}'den beri takipte</div>
+
+    <div class="coin-add-box">
+      <label style="font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold)">Yeni Güncelleme</label>
+      <div class="bias-btns" id="coin-update-bias-btns">
+        <button type="button" class="bias-btn ${c.bias==='Bullish'?'active':''}" data-bias="Bullish">▲ Bullish</button>
+        <button type="button" class="bias-btn ${c.bias==='Nötr'?'active':''}" data-bias="Nötr">● Nötr</button>
+        <button type="button" class="bias-btn ${c.bias==='Bearish'?'active':''}" data-bias="Bearish">▼ Bearish</button>
+      </div>
+      <input type="hidden" id="coin-update-bias" value="${c.bias}" />
+      <textarea id="coin-update-text" rows="3" placeholder="Bu haftaki analiz / güncelleme…" style="margin-bottom:10px"></textarea>
+      <button class="btn-gold btn-sm" onclick="addCoinUpdate()">+ Güncelleme Kaydet</button>
+    </div>
+
+    <div class="coin-timeline">
+      ${updates.length ? updates.map(u => `
+        <div class="coin-tl-item">
+          <div class="coin-tl-head">
+            <span class="coin-tl-date">${dayjs(u.date).format('DD MMM YYYY')}</span>
+            ${biasBadge(u.bias)}
+            <button class="coin-tl-del" onclick="deleteCoinUpdate('${u.id}')">🗑</button>
+          </div>
+          <div class="coin-tl-text">${escapeHtml(u.text)}</div>
+        </div>`).join('')
+        : '<div style="color:var(--dim);font-size:12px">Henüz güncelleme yok — yukarıdan ilk notunu ekle.</div>'}
+    </div>`;
+  setupBiasBtns('#coin-update-bias-btns', 'coin-update-bias');
+}
+
+function addCoinUpdate() {
+  const c = coinNotes.find(x => x.id === coinDetailId);
+  if (!c) return;
+  const text = document.getElementById('coin-update-text').value.trim();
+  if (!text) { alert('Not yazın'); return; }
+  const bias = document.getElementById('coin-update-bias').value || c.bias;
+  c.updates.push({ id: Date.now().toString(), date: dayjs().format('YYYY-MM-DD'), bias, text });
+  c.bias = bias;
+  save();
+  renderCoinDetail(c);
+  renderCoinNotes();
+}
+
+function deleteCoinUpdate(uid) {
+  const c = coinNotes.find(x => x.id === coinDetailId);
+  if (!c) return;
+  c.updates = c.updates.filter(u => u.id !== uid);
+  save();
+  renderCoinDetail(c);
+  renderCoinNotes();
+}
+
+function deleteCoin(id) {
+  if (!confirm('Bu coin ve tüm analiz geçmişi silinecek. Emin misiniz?')) return;
+  coinNotes = coinNotes.filter(c => c.id !== id);
+  save();
+  closeCoinDetail();
+  renderCoinNotes();
+}
+
 // ===== CALENDAR =====
 let currentCalMonth = dayjs();
 function setupCalNav() {
@@ -1249,10 +1523,13 @@ function showCalDay(ds) {
 }
 
 // ===== SCREENSHOT =====
+// Holds the current form's images (base64) — supports multiple.
+let formShots = [];
+
 function setupScreenshot() {
   const fileInput = document.getElementById('f-screenshot-file');
   const dropArea  = document.getElementById('screenshot-drop-area');
-  fileInput.addEventListener('change', e => { if (e.target.files[0]) loadScreenshot(e.target.files[0]); });
+  fileInput.addEventListener('change', e => { loadShots(e.target.files); fileInput.value=''; });
   document.getElementById('screenshot-placeholder').addEventListener('click', e => {
     if (!e.target.classList.contains('upload-link')) fileInput.click();
   });
@@ -1260,36 +1537,72 @@ function setupScreenshot() {
   dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
   dropArea.addEventListener('drop', e => {
     e.preventDefault(); dropArea.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith('image/')) loadScreenshot(f);
+    loadShots(e.dataTransfer.files);
   });
   document.addEventListener('paste', e => {
     if (!document.getElementById('page-add').classList.contains('active')) return;
-    const item = Array.from(e.clipboardData.items).find(i=>i.type.startsWith('image/'));
-    if (item) loadScreenshot(item.getAsFile());
+    const imgs = Array.from(e.clipboardData.items).filter(i=>i.type.startsWith('image/')).map(i=>i.getAsFile());
+    if (imgs.length) loadShots(imgs);
   });
 }
 
-function loadScreenshot(file) {
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const d = ev.target.result;
-    document.getElementById('f-screenshot').value = d;
-    document.getElementById('screenshot-preview-img').src = d;
-    document.getElementById('screenshot-placeholder').classList.add('hidden');
-    document.getElementById('screenshot-preview-wrap').classList.remove('hidden');
-  };
-  reader.readAsDataURL(file);
+function loadShots(fileList) {
+  Array.from(fileList).filter(f => f && f.type.startsWith('image/')).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => { formShots.push(ev.target.result); renderShotThumbs(); };
+    reader.readAsDataURL(file);
+  });
 }
 
-function removeScreenshot() {
-  document.getElementById('f-screenshot').value = '';
-  document.getElementById('f-screenshot-file').value = '';
-  document.getElementById('screenshot-preview-img').src = '';
-  document.getElementById('screenshot-placeholder').classList.remove('hidden');
-  document.getElementById('screenshot-preview-wrap').classList.add('hidden');
+function renderShotThumbs() {
+  const wrap = document.getElementById('screenshot-thumbs');
+  wrap.innerHTML = formShots.map((src, i) => `
+    <div class="shot-thumb">
+      <img src="${src}" onclick="openLightbox(${i})" />
+      <button type="button" class="shot-remove" onclick="removeShot(${i})" title="Kaldır">✕</button>
+      <span class="shot-num">${i+1}</span>
+    </div>`).join('');
+  document.getElementById('screenshot-placeholder')
+    .querySelector('.upload-hint').textContent = formShots.length
+      ? `${formShots.length} görsel eklendi — daha ekleyebilirsin`
+      : 'Birden fazla görsel ekleyebilirsin — HTF, LTF, giriş, sonuç…';
 }
-function resetScreenshot() { removeScreenshot(); }
+
+function removeShot(i) { formShots.splice(i,1); renderShotThumbs(); }
+function resetScreenshot() { formShots = []; renderShotThumbs(); }
+
+// Lightbox uses formShots when editing/adding; openTradeLightbox uses a passed array.
+let lightboxImgs = [], lightboxIdx = 0;
+function openLightbox(i, imgs) {
+  lightboxImgs = imgs || formShots;
+  lightboxIdx = i;
+  showLightbox();
+}
+function showLightbox() {
+  let lb = document.getElementById('lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'lightbox'; lb.className = 'lightbox';
+    lb.innerHTML = `
+      <button class="lb-close" onclick="closeLightbox()">✕</button>
+      <button class="lb-nav lb-prev" onclick="lbStep(-1)">‹</button>
+      <img class="lb-img" id="lb-img" />
+      <button class="lb-nav lb-next" onclick="lbStep(1)">›</button>
+      <div class="lb-counter" id="lb-counter"></div>`;
+    lb.addEventListener('click', e => { if (e.target === lb) closeLightbox(); });
+    document.body.appendChild(lb);
+  }
+  lb.classList.add('open');
+  document.getElementById('lb-img').src = lightboxImgs[lightboxIdx];
+  document.getElementById('lb-counter').textContent = `${lightboxIdx+1} / ${lightboxImgs.length}`;
+  const multi = lightboxImgs.length > 1;
+  lb.querySelectorAll('.lb-nav').forEach(n => n.style.display = multi ? '' : 'none');
+}
+function lbStep(d) {
+  lightboxIdx = (lightboxIdx + d + lightboxImgs.length) % lightboxImgs.length;
+  showLightbox();
+}
+function closeLightbox() { document.getElementById('lightbox')?.classList.remove('open'); }
 
 // ===== CHART HELPERS =====
 const COLORS = ['#c9a84c','#2dba7a','#e05050','#c97a2d','#5b8cff','#a78bfa','#34d399','#fb923c'];

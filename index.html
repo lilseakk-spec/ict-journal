@@ -333,7 +333,7 @@
               </div>
               <div class="form-group">
                 <label>Risk % (Kasa)</label>
-                <input type="number" id="f-risk-pct" step="0.1" placeholder="1.0" min="0.1" max="10" />
+                <input type="number" id="f-risk-pct" step="0.1" placeholder="1.0" min="0.1" />
               </div>
             </div>
             <div class="risk-calc-box" id="risk-calc-box">
@@ -379,20 +379,24 @@
                 </div>
                 <input type="hidden" id="f-emotion" value="3" />
               </div>
-              <div class="form-group">
-                <label>Kural İhlali</label>
-                <select id="f-mistake" multiple class="multi-select">
-                  <option value="fomo">FOMO girişi</option>
-                  <option value="revenge">Revenge trade</option>
-                  <option value="overleverage">Aşırı lot</option>
-                  <option value="early">Erken giriş</option>
-                  <option value="late">Geç giriş</option>
-                  <option value="no_confluence">Confluence yok</option>
-                  <option value="sl_moved">SL taşıdı</option>
-                  <option value="tp_early">Erken TP</option>
-                  <option value="news">Haberde işlem</option>
-                  <option value="none">İhlal yok</option>
-                </select>
+            </div>
+
+            <div class="form-group" style="margin-top:20px">
+              <label>Kural İhlali <span class="hint-text">— birden fazla seçilebilir</span></label>
+              <div class="mistake-checkboxes" id="mistake-checkboxes">
+                <label class="mistake-cb"><input type="checkbox" value="fomo" /><span>FOMO Girişi</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="revenge" /><span>Revenge Trade</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="overleverage" /><span>Aşırı Lot</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="no_stop" /><span>Stop Koyulmadı</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="sl_moved" /><span>SL Taşıdı</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="early" /><span>Erken Giriş</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="late" /><span>Geç Giriş</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="chase" /><span>Fiyat Kovaladı</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="no_confluence" /><span>Confluence Yok</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="no_plan" /><span>Plansız Giriş</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="tp_early" /><span>Erken TP</span></label>
+                <label class="mistake-cb"><input type="checkbox" value="news" /><span>Haberde İşlem</span></label>
+                <label class="mistake-cb none"><input type="checkbox" value="none" /><span>✓ İhlal Yok</span></label>
               </div>
             </div>
           </div>
@@ -411,20 +415,16 @@
               </div>
             </div>
             <div class="form-group" style="margin-top:14px">
-              <label>Ekran Görüntüsü <span style="color:var(--ghost);font-weight:400;text-transform:none;letter-spacing:0">— sürükle, yapıştır (Ctrl+V) veya seç</span></label>
+              <label>Grafikler / Ekran Görüntüleri <span style="color:var(--ghost);font-weight:400;text-transform:none;letter-spacing:0">— birden fazla; sürükle, yapıştır (Ctrl+V) veya seç</span></label>
               <div class="screenshot-upload-area" id="screenshot-drop-area">
-                <input type="file" id="f-screenshot-file" accept="image/*" style="display:none" />
+                <input type="file" id="f-screenshot-file" accept="image/*" multiple style="display:none" />
                 <div id="screenshot-placeholder" class="upload-placeholder">
                   <div class="upload-icon">📷</div>
-                  <div>Sürükle bırak veya <button type="button" class="upload-link" onclick="document.getElementById('f-screenshot-file').click()">dosya seç</button></div>
-                  <div class="upload-hint">PNG, JPG, WebP</div>
+                  <div>Sürükle bırak, yapıştır veya <button type="button" class="upload-link" onclick="document.getElementById('f-screenshot-file').click()">dosya seç</button></div>
+                  <div class="upload-hint">Birden fazla görsel ekleyebilirsin — HTF, LTF, giriş, sonuç…</div>
                 </div>
-                <div id="screenshot-preview-wrap" class="screenshot-preview-wrap hidden">
-                  <img id="screenshot-preview-img" class="screenshot-preview-thumb" />
-                  <button type="button" class="screenshot-remove" onclick="removeScreenshot()">✕ Kaldır</button>
-                </div>
+                <div id="screenshot-thumbs" class="screenshot-thumbs"></div>
               </div>
-              <input type="hidden" id="f-screenshot" />
             </div>
           </div>
 
@@ -516,7 +516,7 @@
               </div>
               <div class="form-group">
                 <label>Risk %</label>
-                <input type="number" id="calc-risk" step="0.1" placeholder="1.0" min="0.1" max="10" />
+                <input type="number" id="calc-risk" step="0.1" placeholder="1.0" min="0.1" />
               </div>
               <div class="form-group">
                 <label>Giriş</label>
@@ -598,11 +598,26 @@
     <!-- ─── GÜNLÜK ─── -->
     <div id="page-journal" class="page">
       <div class="page-header">
-        <div><h1>Günlük</h1><p class="page-sub">Günlük notlar ve psikoloji takibi</p></div>
-        <button class="btn-primary" onclick="openJournalModal()">+ Yeni Giriş</button>
+        <div><h1>Günlük</h1><p class="page-sub">Günlük notlar ve coin analiz takibi</p></div>
+        <button class="btn-primary" id="journal-add-btn" onclick="openJournalModal()">+ Yeni Giriş</button>
       </div>
       <div class="journal-layout">
-        <div class="journal-list" id="journal-list"></div>
+        <div class="seg-control" id="journal-seg">
+          <button class="seg-btn active" data-tab="daily">📓 Günlük Notlar</button>
+          <button class="seg-btn" data-tab="coins">📊 Coin Analiz</button>
+        </div>
+
+        <div class="journal-tab" id="tab-daily">
+          <div class="journal-list" id="journal-list"></div>
+        </div>
+
+        <div class="journal-tab hidden" id="tab-coins">
+          <div class="coin-toolbar">
+            <span class="coin-toolbar-hint">Coinleri haftalık analiz et — her güncellemede not ekle, fikrinin nasıl evrildiğini gör.</span>
+            <button class="btn-gold btn-sm" onclick="openCoinModal()">+ Coin Ekle</button>
+          </div>
+          <div class="coin-grid" id="coin-grid"></div>
+        </div>
       </div>
     </div>
 
@@ -620,6 +635,11 @@
         <div id="calendar-grid" class="calendar-grid"></div>
         <div id="cal-day-detail" class="cal-day-detail hidden"></div>
       </div>
+    </div>
+
+    <!-- ─── TRADE DETAY (tam sayfa rapor) ─── -->
+    <div id="page-trade-detail" class="page">
+      <div id="trade-detail-body"></div>
     </div>
 
   </main>
@@ -679,6 +699,49 @@
       <button class="btn-secondary" onclick="closeJournalModal()">İptal</button>
       <button class="btn-primary" onclick="saveJournal()">Kaydet</button>
     </div>
+  </div>
+</div>
+
+<!-- Coin ekle -->
+<div id="coin-modal" class="modal hidden">
+  <div class="modal-overlay" onclick="closeCoinModal()"></div>
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeCoinModal()">✕</button>
+    <h2 style="font-size:16px;font-weight:600;margin-bottom:20px">Coin Takibe Ekle</h2>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Sembol</label>
+      <div class="symbol-autocomplete" id="coin-symbol-ac">
+        <input type="text" id="coin-symbol-input" placeholder="BTC, ETH, SOL…" autocomplete="off" />
+        <div class="symbol-dropdown hidden" id="coin-symbol-dropdown"></div>
+        <input type="hidden" id="coin-symbol" />
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Mevcut Bias</label>
+      <div class="bias-btns" id="coin-bias-btns">
+        <button type="button" class="bias-btn" data-bias="Bullish">▲ Bullish</button>
+        <button type="button" class="bias-btn" data-bias="Nötr">● Nötr</button>
+        <button type="button" class="bias-btn" data-bias="Bearish">▼ Bearish</button>
+      </div>
+      <input type="hidden" id="coin-bias" value="Nötr" />
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label>İlk Analiz Notu</label>
+      <textarea id="coin-note" rows="4" placeholder="HTF yapısı, önemli seviyeler, beklenti…"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeCoinModal()">İptal</button>
+      <button class="btn-primary" onclick="saveCoin()">Takibe Al</button>
+    </div>
+  </div>
+</div>
+
+<!-- Coin detay / timeline -->
+<div id="coin-detail-modal" class="modal hidden">
+  <div class="modal-overlay" onclick="closeCoinDetail()"></div>
+  <div class="modal-content" id="coin-detail-content">
+    <button class="modal-close" onclick="closeCoinDetail()">✕</button>
+    <div id="coin-detail-body"></div>
   </div>
 </div>
 
